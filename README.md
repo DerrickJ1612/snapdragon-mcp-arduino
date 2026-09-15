@@ -4,6 +4,18 @@ This repository is a small, local example of a Qwen 3 model running through
 Qualcomm AI Hub GenieX on a Snapdragon X Elite and calling functions on an
 Arduino Uno Q through MCP.
 
+## Quick start
+
+1. Start GenieX: `geniex pull qualcomm/Qwen3-4B-Instruct-2507`, then
+   `geniex serve`.
+2. Clone this repository on the Uno Q and upload the `rpc_hearts` sketch.
+3. On the Uno Q, install `arduino/unoq/requirements.txt` and run
+   `python -m arduino.unoq.mcp_server`.
+4. On Windows, forward port 3001 with ADB.
+5. Install `x_elite/requirements.txt` and run `python -m x_elite.client`.
+
+See the numbered sections below for the exact commands and prerequisites.
+
 ```text
 Qwen 3 / GenieX -> Python chat client -> MCP over ADB
                  -> FastMCP on Uno Q -> Arduino RPC -> MCU
@@ -41,24 +53,26 @@ Keep `geniex serve` running. It provides the local OpenAI-compatible API at
 
 ## 2. Put the Arduino files on the Uno Q
 
-During development, copy the current local files to the connected board:
-
-```powershell
-adb -s 227615311 shell "mkdir -p /home/arduino/local_dev"
-adb -s 227615311 push arduino /home/arduino/local_dev/
-```
-
-Once this repository is published, users can clone it instead:
 
 ```bash
-cd /home/arduino
-git clone <repository-url> local_dev
+mkdir -p /home/arduino/local_dev && cd /home/arduino/local_dev
+```
+```bash
+git clone https://github.com/DerrickJ1612/snapdragon-mcp-arduino.git
 ```
 
-In both cases, `/home/arduino/local_dev` must contain the repository's
-`arduino` directory.
 
 ## 3. Compile and upload the MCU sketch
+
+In a Windows terminal grab the serial number for Uno Q
+```powershell
+adb devices
+```
+adb devices returns below:
+```powershell
+List of devices attached
+227615311       device
+```
 
 Open an Uno Q shell:
 
