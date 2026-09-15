@@ -76,7 +76,9 @@ def board_info() -> dict:
 
 @mcp.tool
 def get_board_status() -> dict:
-    """Check the current connection and status of the Arduino Uno Q."""
+    """Check the current connection and status of the Arduino Uno Q. 
+    This also gives board information and provides a board description
+    """
     status = board_info()
     try:
         response = call_mcu("mcu_ping")
