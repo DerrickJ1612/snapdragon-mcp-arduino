@@ -1,0 +1,186 @@
+# Snapdragon X Elite + Arduino Uno Q over MCP
+
+This repository is a small, local example of a Qwen 3 model running through
+Qualcomm AI Hub GenieX on a Snapdragon X Elite and calling functions on an
+Arduino Uno Q through MCP.
+
+```text
+Qwen 3 / GenieX -> Python chat client -> MCP over ADB
+                 -> FastMCP on Uno Q -> Arduino RPC -> MCU
+```
+
+The example exposes two tools:
+
+- `get_board_status` returns board information and calls `mcu_ping` on the MCU.
+  The built-in LED blinks three times so the status check is physically visible.
+- `flash_heart` plays one heart animation on the LED matrix.
+
+## Repository layout
+
+```text
+arduino/rpc/                    Existing Linux-to-MCU RPC bridge
+arduino/rpc/MCU/sketch/         Arduino sketch
+arduino/unoq/mcp_server.py      FastMCP server for the Uno Q Linux MPU
+x_elite/client.py               GenieX and MCP chat client for Windows
+```
+
+## 1. Set up GenieX on the X Elite
+
+Install GenieX using Qualcomm's
+[Windows ARM64 instructions](https://geniex.aihub.qualcomm.com/en/run/cli/install/#windows-arm64),
+then open PowerShell:
+
+```powershell
+geniex --help
+geniex pull qualcomm/Qwen3-4B-Instruct-2507
+geniex serve
+```
+
+Keep `geniex serve` running. It provides the local OpenAI-compatible API at
+`http://127.0.0.1:18181/v1`.
+
+## 2. Put the Arduino files on the Uno Q
+
+During development, copy the current local files to the connected board:
+
+```powershell
+adb -s 227615311 shell "mkdir -p /home/arduino/local_dev"
+adb -s 227615311 push arduino /home/arduino/local_dev/
+```
+
+Once this repository is published, users can clone it instead:
+
+```bash
+cd /home/arduino
+git clone <repository-url> local_dev
+```
+
+In both cases, `/home/arduino/local_dev` must contain the repository's
+`arduino` directory.
+
+## 3. Compile and upload the MCU sketch
+
+Open an Uno Q shell:
+
+```powershell
+adb -s 227615311 shell
+```
+
+Compile and upload from the Linux MPU with Arduino CLI:
+
+```bash
+arduino-cli lib update-index
+arduino-cli lib install Arduino_RouterBridge
+
+cd /home/arduino/local_dev/arduino/rpc/MCU/sketch/rpc_hearts
+arduino-cli compile --fqbn arduino:zephyr:unoq .
+arduino-cli upload --fqbn arduino:zephyr:unoq .
+```
+
+Installing `Arduino_RouterBridge` also installs its `Arduino_RPClite` and
+`MsgPack` dependencies. The sketch registers `mcu_ping` and `flash_heart` with
+the Arduino router.
+
+## 4. Start FastMCP on the Uno Q
+
+The Uno Q image may not include `pip` or `venv`. Install them once:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y python3-pip python3-venv
+```
+
+These package installation commands require the Uno Q to have internet access.
+
+Create the environment and start the server from the repository root:
+
+```bash
+cd /home/arduino/local_dev
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r arduino/unoq/requirements.txt
+python -m arduino.unoq.mcp_server
+```
+
+FastMCP listens on the board's loopback interface at port 3001. Keep this
+terminal running.
+
+## 5. Forward MCP over ADB
+
+In another Windows terminal:
+
+```powershell
+adb -s 227615311 forward tcp:3001 tcp:3001
+```
+
+The client only knows the local MCP URL. The ADB command can later be replaced
+with an SSH tunnel without changing Python code.
+
+## 6. Start the chat client
+
+From the repository root on Windows:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -r x_elite/requirements.txt
+.\.venv\Scripts\python -m x_elite.client
+```
+
+Try:
+
+```text
+Check whether the Arduino is connected.
+Flash the heart once.
+```
+
+The client prints the selected MCP tool and raw result before Qwen's final
+answer. Use `/clear` to clear the conversation and `/quit` to exit.
+
+`get_board_status` takes about 600 ms while the MCU blinks `LED_BUILTIN` three
+times at 100 ms on and 100 ms off. A successful result looks like this:
+
+```json
+{
+  "board_model": "Arduino UnoQ",
+  "board_serial": "28dc9ba",
+  "hostname": "SCL-UNOQ24",
+  "os": "Debian GNU/Linux 13 (trixie)",
+  "architecture": "aarch64",
+  "arduino_core": "arduino:zephyr 0.56.0",
+  "connected": true,
+  "rpc_response": "pong"
+}
+```
+
+The model, serial, hostname, operating system, and core version are read from
+the current device, so their values can differ from this example. An optional
+identity field that cannot be read is returned as `"unknown"`.
+
+Optional settings:
+
+```powershell
+.\.venv\Scripts\python -m x_elite.client --help
+```
+
+## Troubleshooting
+
+- **Cannot connect to MCP:** confirm the FastMCP process is running, then run
+  `adb -s 227615311 forward --list`.
+- **Cannot connect to GenieX:** keep `geniex serve` open and check
+  `http://127.0.0.1:18181`.
+- **Router socket error:** check `systemctl status arduino-router` and
+  `/var/run/arduino-router.sock` on the Uno Q.
+- **No handler for a tool:** compile and upload the updated sketch again.
+- **No status blink:** upload the updated sketch and confirm
+  `systemctl status arduino-router` reports an active service.
+- **RPC timeout:** the physical result is unknown. Check the board before
+  retrying `flash_heart`.
+- **Python import error on Uno Q:** start the server from
+  `/home/arduino/local_dev` with `python -m arduino.unoq.mcp_server`.
+
+## Upstream reuse
+
+The MCP discovery, tool schema conversion, and tool-result conversation flow
+in `x_elite/client.py` are adapted from
+[DerrickJ1612/qnn_sample_apps](https://github.com/DerrickJ1612/qnn_sample_apps/tree/main/src).
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
