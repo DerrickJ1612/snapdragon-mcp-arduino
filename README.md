@@ -111,7 +111,7 @@ Create the environment and start the server from the repository root:
 ```bash
 cd /home/arduino/local_dev
 python3 -m venv .venv
-. .venv/bin/activate
+source .venv/bin/activate
 python -m pip install -r arduino/unoq/requirements.txt
 python -m arduino.unoq.mcp_server
 ```

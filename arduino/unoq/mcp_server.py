@@ -76,7 +76,7 @@ def board_info() -> dict:
 
 @mcp.tool
 def get_board_status() -> dict:
-    """Return Uno Q information and blink its built-in LED three times."""
+    """Check the current connection and status of the Arduino Uno Q."""
     status = board_info()
     try:
         response = call_mcu("mcu_ping")
@@ -95,7 +95,11 @@ def get_board_status() -> dict:
 
 @mcp.tool
 def flash_heart() -> dict:
-    """Play one heart animation on the Uno Q LED matrix."""
+    """Display a heart animation on the Arduino Uno Q LED matrix.
+
+    Use this when the user asks to display, show, flash, or animate
+    a heart on the Arduino Uno Q.
+    """
     response = call_mcu("flash_heart")
     if response != 1:
         raise RuntimeError(f"Unexpected MCU response: {response!r}")

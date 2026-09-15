@@ -13,10 +13,9 @@ from openai import AsyncOpenAI
 
 DEFAULT_MODEL = "qualcomm/Qwen3-4B-Instruct-2507"
 SYSTEM_PROMPT = (
-    "You control an Arduino Uno Q using the provided tools. "
-    "Use get_board_status when asked about the connection. "
-    "Use flash_heart only when the user asks for the heart animation. "
-    "After a tool result, answer briefly and do not call the same tool again."
+    "You are an assistant that can interact with an Arduino Uno Q "
+    "using the provided tools. Use tools when appropriate to fulfill "
+    "the user's request."
 )
 
 
